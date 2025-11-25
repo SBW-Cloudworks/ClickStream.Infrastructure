@@ -2,4 +2,6 @@
 **/.terraform/*
 *.tfstate
 *.tfstate.*
+Terraform/output/*
+Terraform/ClickStream/*
 Terraform/*.zip
