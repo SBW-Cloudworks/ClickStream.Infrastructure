@@ -42,6 +42,7 @@ aws --version
 create VPC/Subnets/IGW/NAT (optional), IAM roles/policies, Lambda, API Gateway, EventBridge, EC2, S3, SNS, Cognito, Amplify, ALB/NLB/VPC endpoints.
 ![alt text](img/image-6.png)
 ![alt text](img/image-7.png)
+
 **4) Pick a region with at least 2 AZs (for example `ap-southeast-1`); check:**
 
 ```bash
@@ -52,7 +53,32 @@ aws configure set output json --profile <aws_profile>
 
 **5) Prepare Lambda ZIPs**
 
-- build/package and point `lambda_ingest_zip`, `lambda_etl_zip` to real files.
+- Package each Lambda into a ZIP with its dependencies:
+
+- For Python:
+```
+cd lambda/ingest
+pip install -r requirements.txt -t .
+zip -r ../../artifacts/lambda_ingest.zip .
+```
+```
+cd ../etl
+pip install -r requirements.txt -t .
+zip -r ../../artifacts/lambda_etl.zip .
+```
+> (Adjust paths as needed; ensure the handler file is inside the zip at root.)
+
+- Update `Terraform/ProductionAWS-V2/prod.auto.tfvars` to point to those ZIPs:
+```
+lambda_ingest_zip = "../../artifacts/lambda_ingest.zip"
+lambda_etl_zip    = "../../artifacts/lambda_etl.zip"
+```
+Sanity check the paths exist:
+**PowerShell:** `Test-Path "../../artifacts/lambda_ingest.zip"`
+**Bash:** `ls ../../artifacts/lambda_ingest.zip`
+
+After this, Terraform will upload those ZIPs when creating the Lambda functions.
+
 
 **6) SSH/SSM**
 
