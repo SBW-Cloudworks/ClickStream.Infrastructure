@@ -8,7 +8,7 @@ This stack matches the V10 diagram with these decisions:
 - Amplify enabled by default
 
 ## 0) Before you run
-1) Install Terraform >= 1.5 and AWS CLI
+**1) Install Terraform >= 1.5 and AWS CLI**
    ```bash
    winget install --id HashiCorp.Terraform -e
    winget install --id Amazon.AWSCLI -e
@@ -18,7 +18,7 @@ This stack matches the V10 diagram with these decisions:
    terraform version
    aws --version
    ```
-2) Configure AWS CLI profile:
+**2) Configure AWS CLI profile:**
    - Default profile: run `aws configure`, enter Access Key, Secret, Region, Output; then set `aws_profile = ""` in `prod.auto.tfvars` to use that default profile. Terraform will automatically pick up the default profile; nothing else is needed.
    - Named profile (recommended): run `aws configure --profile <name>` (e.g., `prod`); then set `aws_profile = "<name>"` in `prod.auto.tfvars`.
    1) Create User
@@ -31,14 +31,15 @@ This stack matches the V10 diagram with these decisions:
   ![alt text](image-4.png)
   ![alt text](image-5.png)
 
-1) Permissions: create VPC/Subnets/IGW/NAT (optional), IAM roles/policies, Lambda, API Gateway, EventBridge, EC2, S3, SNS, Cognito, Amplify, ALB/NLB/VPC endpoints.
-2) Pick a region with at least 2 AZs (for example `ap-southeast-1`); check:
+**3) Permissions:**
+create VPC/Subnets/IGW/NAT (optional), IAM roles/policies, Lambda, API Gateway, EventBridge, EC2, S3, SNS, Cognito, Amplify, ALB/NLB/VPC endpoints.
+**4) Pick a region with at least 2 AZs (for example `ap-southeast-1`); check:**
    ```bash
    aws ec2 describe-availability-zones --region <region>
    ```
-3) Prepare Lambda ZIPs and point `lambda_ingest_zip`, `lambda_etl_zip` to real files.
-4) SSH/SSM: set `oltp_key_name`, `analytics_key_name` (or leave empty and use Session Manager).
-5) Amplify: provide repo URL, PAT, branch; keep `enable_amplify = true` unless you want to disable.
+5) Prepare Lambda ZIPs and point `lambda_ingest_zip`, `lambda_etl_zip` to real files.
+6) SSH/SSM: set `oltp_key_name`, `analytics_key_name` (or leave empty and use Session Manager).
+7) Amplify: provide repo URL, PAT, branch; keep `enable_amplify = true` unless you want to disable.
 
 ## 1) Remote state (recommended)
 1.1) Create an S3 bucket + DynamoDB table for state/lock:
