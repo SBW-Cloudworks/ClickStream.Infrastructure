@@ -33,6 +33,8 @@ This stack matches the V10 diagram with these decisions:
 
 **3) Permissions:**
 create VPC/Subnets/IGW/NAT (optional), IAM roles/policies, Lambda, API Gateway, EventBridge, EC2, S3, SNS, Cognito, Amplify, ALB/NLB/VPC endpoints.
+![alt text](image-6.png)
+![alt text](image-7.png)
 **4) Pick a region with at least 2 AZs (for example `ap-southeast-1`); check:**
    ```bash
    aws ec2 describe-availability-zones --region <region>
