@@ -23,18 +23,18 @@ This stack matches the V10 diagram with these decisions:
    - Named profile (recommended): run `aws configure --profile <name>` (e.g., `prod`); then set `aws_profile = "<name>"` in `prod.auto.tfvars`.
    1) Create User
 
-  ![alt text](image.png)
-  ![alt text](image-1.png)
-  ![alt text](image-2.png)
-  ![alt text](image-3.png)
+  ![alt text](img/image.png)
+  ![alt text](img/image-1.png)
+  ![alt text](img/image-2.png)
+  ![alt text](img/image-3.png)
    2) Create Key
-  ![alt text](image-4.png)
-  ![alt text](image-5.png)
+  ![alt text](img/image-4.png)
+  ![alt text](img/image-5.png)
 
 **3) Permissions:**
 create VPC/Subnets/IGW/NAT (optional), IAM roles/policies, Lambda, API Gateway, EventBridge, EC2, S3, SNS, Cognito, Amplify, ALB/NLB/VPC endpoints.
-![alt text](image-6.png)
-![alt text](image-7.png)
+![alt text](img/image-6.png)
+![alt text](img/image-7.png)
 **4) Pick a region with at least 2 AZs (for example `ap-southeast-1`); check:**
    ```bash
    aws ec2 describe-availability-zones --region <region>
