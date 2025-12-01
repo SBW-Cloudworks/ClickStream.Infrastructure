@@ -1,23 +1,30 @@
-# SBW ClickStream – Production AWS Terraform (Architecture V10, PrivateLink + ALB)
+# SBW ClickStream - Production AWS Terraform (Architecture V10, PrivateLink + ALB)
 
-This stack follows the project source of truth (`README.md`) and the V10 diagram, with the requested changes:
-- NAT Gateway **disabled by default**
-- Only **two buckets** (media + raw); ETL writes directly to Postgres
-- Lambdas stay **outside the VPC**, with a **PrivateLink + internal NLB** path toward the internal ALB/DWH/Shiny
-- Data Warehouse **shares the same EC2** as R Shiny
-- **Amplify enabled by default**
+This stack matches the V10 diagram with these decisions:
+- NAT Gateway disabled by default
+- Only two buckets (media + raw); ETL writes directly to Postgres
+- Lambdas stay outside the VPC, reaching DWH/Shiny via PrivateLink + internal NLB
+- DWH + R Shiny on the same EC2
+- Amplify enabled by default
 
 ## 0) Before you run
-1) Install Terraform >= 1.5 and AWS CLI; verify `terraform version`, `aws --version`.
+1) Install Terraform >= 1.5 and AWS CLI; verify:
+   ```bash
+   terraform version
+   aws --version
+   ```
 2) Login via `aws configure` or existing profile; set `aws_profile` in `prod.auto.tfvars`.
 3) Permissions: create VPC/Subnets/IGW/NAT (optional), IAM roles/policies, Lambda, API Gateway, EventBridge, EC2, S3, SNS, Cognito, Amplify, ALB/NLB/VPC endpoints.
-4) Pick a region with ≥2 AZs (e.g., `ap-southeast-1`); check via `aws ec2 describe-availability-zones --region <region>`.
+4) Pick a region with at least 2 AZs (for example `ap-southeast-1`); check:
+   ```bash
+   aws ec2 describe-availability-zones --region <region>
+   ```
 5) Prepare Lambda ZIPs and point `lambda_ingest_zip`, `lambda_etl_zip` to real files.
 6) SSH/SSM: set `oltp_key_name`, `analytics_key_name` (or leave empty and use Session Manager).
-7) Amplify: provide repo URL, PAT, branch; leave `enable_amplify = true` unless you want to disable.
+7) Amplify: provide repo URL, PAT, branch; keep `enable_amplify = true` unless you want to disable.
 
 ## 1) Remote state (recommended)
-Create an S3 bucket + DynamoDB table for state/lock, then init:
+1.1) Create an S3 bucket + DynamoDB table for state/lock:
 ```bash
 aws s3api create-bucket --bucket <tfstate-bucket> --region <region> --create-bucket-configuration LocationConstraint=<region>
 aws dynamodb create-table --table-name <lock-table> \
@@ -25,45 +32,94 @@ aws dynamodb create-table --table-name <lock-table> \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
 
-terraform -chdir=Terraform/ProductionAWS init \
+terraform -chdir=Terraform/ProductionAWS-V2 init \
   -backend-config="bucket=<tfstate-bucket>" \
   -backend-config="key=clickstream/prod/terraform.tfstate" \
   -backend-config="region=<region>" \
   -backend-config="dynamodb_table=<lock-table>"
 ```
+1.2) Optional: harden the state bucket (versioning, SSE, TLS-only policy as in `state-bucket-policy.json`).
 
-## 2) Set variables (`prod.auto.tfvars`)
-Edit `Terraform/ProductionAWS/prod.auto.tfvars` with your real values. Key fields:
-- Region/profile: `region`, `aws_profile`
-- Buckets: `bucket_media`, `bucket_raw`
-- Lambda zips: `lambda_ingest_zip`, `lambda_etl_zip`
-- Network: `enable_nat_gateway` (defaults to `false`), `allowed_admin_cidrs` (who can reach Shiny ALB)
-- EC2: key pairs, optional AMI overrides, volume sizes
-- Cognito/SNS: names for pool/client/topic
-- Amplify: repo URL, token, branch (enabled by default)
-- Logging: `log_retention_days`
+## 2) Set variables (prod.auto.tfvars)
+Edit `Terraform/ProductionAWS-V2/prod.auto.tfvars` with your real values.
+
+### 2.1) Config toggles (ON/OFF)
+- `enable_nat_gateway` (default `false`) - leave off unless you need outbound internet from private subnets.
+- `enable_amplify` (default `true`) - turn off only if you are not deploying the frontend via Amplify.
+
+### 2.2) Resource identifiers / names (not secrets)
+- AWS: `region`, `aws_profile`
+```hcl
+region      = "ap-southeast-1"
+aws_profile = "prod"
+```
+- S3 buckets: `bucket_media`, `bucket_raw`
+```hcl
+bucket_media = "sbw-clickstream-media-prod"
+bucket_raw   = "sbw-clickstream-raw-prod"
+```
+- Network access: `allowed_admin_cidrs`
+```hcl
+allowed_admin_cidrs = ["203.0.113.0/24"]
+```
+- EC2 access/images: `oltp_key_name`, `analytics_key_name`, optional `oltp_ami_id`, `analytics_ami_id`, and volume sizes (key names are just the EC2 Key Pair names you created; no private key material is stored here)
+```hcl
+oltp_key_name            = "prod-key"
+analytics_key_name       = "prod-key"
+oltp_ami_id              = ""
+analytics_ami_id         = ""
+oltp_root_volume_gb      = 50
+analytics_root_volume_gb = 200
+```
+- Cognito/SNS names: `cognito_user_pool_name`, `cognito_client_name`, `sns_topic_name`
+```hcl
+cognito_user_pool_name = "clickstream-users"
+cognito_client_name    = "clickstream-app-client"
+sns_topic_name         = "clickstream-prod-alerts"
+```
+- Amplify repo/branch: `amplify_repo_url`, `amplify_branch_name`
+```hcl
+amplify_repo_url    = "https://github.com/example-org/example-repo"
+amplify_branch_name = "main"
+```
+- Other: `log_retention_days`
+```hcl
+log_retention_days = 30
+```
+
+### 2.3) Secrets / artifacts
+- Lambda packages: `lambda_ingest_zip`, `lambda_etl_zip` (paths to your built ZIPs)
+```hcl
+lambda_ingest_zip = "../../artifacts/lambda_ingest.zip"
+lambda_etl_zip    = "../../artifacts/lambda_etl.zip"
+```
+- Amplify: `amplify_access_token`
+```hcl
+amplify_access_token = "REPLACE_WITH_GH_PAT"
+```
+> AWS access keys are not stored here; they live in your AWS profile/credential store referenced by `aws_profile`.
 
 ## 3) Deploy
 ```bash
-terraform -chdir=Terraform/ProductionAWS init   # once per backend config
-terraform -chdir=Terraform/ProductionAWS plan   -var-file=prod.auto.tfvars
-terraform -chdir=Terraform/ProductionAWS apply  -var-file=prod.auto.tfvars
+terraform -chdir=Terraform/ProductionAWS-V2 init   # once per backend config
+terraform -chdir=Terraform/ProductionAWS-V2 plan   -var-file=prod.auto.tfvars
+terraform -chdir=Terraform/ProductionAWS-V2 apply  -var-file=prod.auto.tfvars
 ```
 
-## 4) Outputs you’ll get
-- `api_invoke_url` – API Gateway endpoint (POST /click)
-- `lambda_functions` – ingest + etl ARNs
-- `s3_buckets` – media/raw names
+## 4) Outputs you will get
+- `api_invoke_url` - API Gateway endpoint (POST /click)
+- `lambda_functions` - ingest + etl ARNs
+- `s3_buckets` - media/raw names
 - `cognito.user_pool_id`, `cognito.client_id`
 - `sns_topic_arn`
-- `shiny_alb_dns` – internal ALB DNS for Shiny
-- `privatelink` – service name, endpoint ID/DNS, NLB DNS (for Lambda-to-DWH/Shiny over PrivateLink)
-- `ec2_instances` – OLTP and DWH+Shiny instance IDs
+- `shiny_alb_dns` - internal ALB DNS for Shiny
+- `privatelink` - service name, endpoint ID/DNS, NLB DNS (for Lambda-to-DWH/Shiny over PrivateLink)
+- `ec2_instances` - OLTP and DWH+Shiny instance IDs
 - subnet/VPC IDs, S3 VPC endpoint ID
 
 ## 5) Notes on connectivity and security
 - NAT is off by default; S3 access from private subnets uses the S3 Gateway Endpoint.
-- Lambdas are configured **without VPC attachment**; the DWH/Shiny path is exposed via an internal NLB + Endpoint Service to align with the requested PrivateLink pattern, while Shiny admin access flows through an internal ALB (port 80) restricted by `allowed_admin_cidrs`.
+- Lambdas are configured without VPC attachment; the DWH/Shiny path is exposed via an internal NLB + Endpoint Service to align with the requested PrivateLink pattern, while Shiny admin access flows through an internal ALB (port 80) restricted by `allowed_admin_cidrs`.
 - EC2 instances are private-only (no public IP). Use SSM Session Manager or VPN/DirectConnect for access.
 - S3 buckets block public access, have SSE + versioning enabled.
 
