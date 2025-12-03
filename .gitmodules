@@ -1,3 +1,4 @@
 [submodule "Lambda"]
 	path = Lambda
 	url = https://github.com/SBW-Cloudworks/ClickStream.Lambda.git
+	branch = main
