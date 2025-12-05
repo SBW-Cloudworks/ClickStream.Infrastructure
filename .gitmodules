@@ -2,3 +2,6 @@
 	path = Lambda
 	url = https://github.com/SBW-Cloudworks/ClickStream.Lambda.git
 	branch = main
+[submodule "NextJS"]
+	path = NextJS
+	url = https://github.com/SBW-Cloudworks/ClickSteam.NextJS.git
